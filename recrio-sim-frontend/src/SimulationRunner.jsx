@@ -1,3 +1,4 @@
+
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import io from "socket.io-client";
 import { EscalationDashboard } from "./components/EscalationDashboard";
@@ -85,6 +86,8 @@ export default function SimulationRunner() {
 
   const [started, setStarted] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false); // NEW: confirm modal state
+
   const scrollerRef = useRef(null);
   const emit = useCallback((event, payload = {}) => {
     socketRef.current?.emit(event, payload);
@@ -107,7 +110,7 @@ export default function SimulationRunner() {
     scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
   }, [history[active]?.length, active]);
 
-  // Lock-on-tab/blur listeners
+  // Lock-on-tab/blur listeners (kept for other paths)
   const lockActiveAndAdvance = useCallback((reason, channelName) => {
     const ch = channelName || active;
     if (!ch) return;
@@ -135,61 +138,62 @@ export default function SimulationRunner() {
       if (nextName && nextName !== ch) setActive(nextName);
     }
   }, [active, channels, sessionId, socketRef, setHistory, setLocked, setActive]);
-// NEW: soft-penalty on proctor violation (no locking, just skip Q and +1 violation)
-const handleViolationSkip = useCallback((reason, channelName) => {
-  const ch = channelName || active;
-  if (!ch) return;
 
-  // 1) Count the violation
-  setViolations(v => v + 1);
+  // NEW: soft-penalty on proctor violation (no locking, just skip Q and +1 violation)
+  const handleViolationSkip = useCallback((reason, channelName) => {
+    const ch = channelName || active;
+    if (!ch) return;
 
-  // 2) Tell backend (keeps your existing telemetry)
-  socketRef.current?.emit?.("proctor:event", {
-    type: "violation",
-    reason,
-    channel: ch,
-    sessionId,
-    ts: Date.now(),
-  });
+    // 1) Count the violation
+    setViolations(v => v + 1);
 
-  // 3) Advance the conversation to the next question
-  setConversationState(prev => {
-    let { qIdx, fIdx } = prev;
-    let remaining = (prev.remaining ?? MAX_BOT_TURNS);
+    // 2) Telemetry
+    socketRef.current?.emit?.("proctor:event", {
+      type: "violation",
+      reason,
+      channel: ch,
+      sessionId,
+      ts: Date.now(),
+    });
 
-    const nextIdx = qIdx + 1;
-    const hasNext = !!sessionQuestions[nextIdx];
+    // 3) Advance the conversation to the next question
+    setConversationState(prev => {
+      let { qIdx, fIdx } = prev;
+      let remaining = (prev.remaining ?? MAX_BOT_TURNS);
 
-    if (hasNext && remaining > 0) {
-      const nq = sessionQuestions[nextIdx];
-      const nextText = nq?.text ?? nq?.prompt ?? "";
-      const nextName = nq?.sender || "Interviewer";
+      const nextIdx = qIdx + 1;
+      const hasNext = !!sessionQuestions[nextIdx];
 
-      // Post a system note and the next question
+      if (hasNext && remaining > 0) {
+        const nq = sessionQuestions[nextIdx];
+        const nextText = nq?.text ?? nq?.prompt ?? "";
+        const nextName = nq?.sender || "Interviewer";
+
+        // Post a system note and the next question
+        setHistory(prevH => ({
+          ...prevH,
+          [ch]: [
+            ...(prevH[ch] || []),
+            { sender: "system", text: "Tab switch detected — current question skipped.", ts: Date.now() },
+            { sender: "bot:interviewer", name: nextName, text: nextText, ts: Date.now() },
+          ],
+        }));
+
+        // One bot turn consumed
+        return { qIdx: nextIdx, fIdx: -1, remaining: Math.max(0, remaining - 1) };
+      }
+
+      // No more questions to skip — just note it
       setHistory(prevH => ({
         ...prevH,
         [ch]: [
           ...(prevH[ch] || []),
-          { sender: "system", text: "Tab switch detected — current question skipped.", ts: Date.now() },
-          { sender: "bot:interviewer", name: nextName, text: nextText, ts: Date.now() },
+          { sender: "system", text: "Tab switch detected — no more questions to skip.", ts: Date.now() },
         ],
       }));
-
-      // One bot turn consumed when we post the next question
-      return { qIdx: nextIdx, fIdx: -1, remaining: Math.max(0, remaining - 1) };
-    }
-
-    // No more questions to skip — just note it
-    setHistory(prevH => ({
-      ...prevH,
-      [ch]: [
-        ...(prevH[ch] || []),
-        { sender: "system", text: "Tab switch detected — no more questions to skip.", ts: Date.now() },
-      ],
-    }));
-    return prev;
-  });
-}, [active, sessionId, sessionQuestions, setHistory]);
+      return prev;
+    });
+  }, [active, sessionId, sessionQuestions, setHistory]);
 
   // Create session
   useEffect(() => {
@@ -328,37 +332,36 @@ const handleViolationSkip = useCallback((reason, channelName) => {
   }, []);
 
   useEffect(() => {
-  if (!started || !active) return;
-  const onceRef = { current: false };
+    if (!started || !active) return;
+    const onceRef = { current: false };
 
-  const tripOnce = (reason) => {
-    if (onceRef.current) return;
-    onceRef.current = true;
-    // Soft penalty: count violation + skip question (NO locking)
-    handleViolationSkip(reason, active);
-  };
+    const tripOnce = (reason) => {
+      if (onceRef.current) return;
+      onceRef.current = true;
+      // Soft penalty: count violation + skip question (NO locking)
+      handleViolationSkip(reason, active);
+    };
 
-  const onVis = () => {
-    if (document.hidden) tripOnce("visibility:hidden");
-  };
-  const onBlur = () => {
-    tripOnce("window:blur");
-  };
-  const onFocus = () => {
-    // Allow future penalties after the user returns
-    onceRef.current = false;
-  };
+    const onVis = () => {
+      if (document.hidden) tripOnce("visibility:hidden");
+    };
+    const onBlur = () => {
+      tripOnce("window:blur");
+    };
+    const onFocus = () => {
+      // Allow future penalties after the user returns
+      onceRef.current = false;
+    };
 
-  document.addEventListener("visibilitychange", onVis);
-  window.addEventListener("blur", onBlur);
-  window.addEventListener("focus", onFocus);
-  return () => {
-    document.removeEventListener("visibilitychange", onVis);
-    window.removeEventListener("blur", onBlur);
-    window.removeEventListener("focus", onFocus);
-  };
-}, [started, active, handleViolationSkip]);
-
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("blur", onBlur);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [started, active, handleViolationSkip]);
 
   // --- Random scenario and questions selection ---
   useEffect(() => {
@@ -530,6 +533,32 @@ const handleViolationSkip = useCallback((reason, channelName) => {
     [prompts, resolvedIdxSet]
   );
 
+  // ------------------------------
+  // Submit simulation (manual or auto). Locks the active channel.
+  // Hoisted declaration avoids TDZ when used below in effects/JSX.
+  function handleSubmitSimulation(auto = false) {
+    if (submitted) return; // idempotent
+    setSubmitted(true);
+    setSimulationEnded(true);
+
+    // Lock the current channel so user can't type
+    setLocked((L) => ({ ...L, [active]: true }));
+    socketRef.current?.emit?.("session:lock", { sessionId, channel: active, reason: auto ? "auto-submit" : "manual-submit" });
+
+    // Add a clear system note
+    setHistory((prev) => ({
+      ...prev,
+      [active]: [
+        ...(prev[active] || []),
+        { sender: "system", text: auto ? "⏳ Time expired — simulation auto-submitted. Channel locked." : "✅ Simulation submitted. Channel locked.", ts: Date.now() }
+      ]
+    }));
+
+    // Notify backend the simulation is submitted
+    socketRef.current?.emit?.("simulation:submit", { sessionId, auto });
+  }
+  // ------------------------------
+
   // Timer logic
   useEffect(() => {
     if (!started) return;
@@ -548,20 +577,24 @@ const handleViolationSkip = useCallback((reason, channelName) => {
     return () => clearInterval(timer);
   }, [started]);
 
-  // Submit simulation
-  function handleSubmitSimulation() {
-    setSubmitted(true);
-    setSimulationEnded(true);
-    setHistory((prev) => ({
-      ...prev,
-      [active]: [
-        ...(prev[active] || []),
-        { sender: "system", text: "Simulation submitted. You may close your window.", ts: Date.now() }
-      ]
-    }));
-    // Optionally emit to backend:
-    // socketRef.current?.emit("simulation:submit", { sessionId });
-  }
+  // Auto-submit & lock when timer hits 0
+  useEffect(() => {
+    if (!started) return;
+    if (timeRemaining === 0 && !submitted) {
+      handleSubmitSimulation(true); // auto flag
+    }
+    // intentionally not depending on handleSubmitSimulation to keep it stable
+  }, [started, timeRemaining, submitted]);
+
+  // Optional: Esc key closes confirm modal
+  useEffect(() => {
+    if (!showConfirm) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") setShowConfirm(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showConfirm]);
 
   return (
     <div className="sim">
@@ -650,7 +683,7 @@ const handleViolationSkip = useCallback((reason, channelName) => {
               height: "32px",
               alignSelf: "center"
             }}
-            onClick={handleSubmitSimulation}
+            onClick={() => setShowConfirm(true)} // NEW: open confirm modal
             disabled={submitted}
           >
             Submit Simulation
@@ -668,7 +701,7 @@ const handleViolationSkip = useCallback((reason, channelName) => {
               onOpenTask={() => m.taskSummary && setOpenTaskId(m.taskSummary.id)}
             />
           ))}
-          {locked[active] && <div className="locknote">This channel is locked. Switch to another channel.</div>}
+          {locked[active] && <div className="locknote">This channel is locked. You may close the simulation window.</div>}
         </div>
 
         <footer className="sim__composer">
@@ -707,6 +740,72 @@ const handleViolationSkip = useCallback((reason, channelName) => {
           onClose={() => setOpenTaskId(null)}
           onSubmit={submitTask}
         />
+      )}
+
+      {/* NEW: Confirm Submit Modal */}
+      {showConfirm && !submitted && (
+        <div
+          className="modal-backdrop"
+          onClick={(e) => {
+            if (e.target.classList.contains("modal-backdrop")) setShowConfirm(false);
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-title"
+        >
+          <div
+            className="modal"
+            style={{
+              background: "#fff",
+              borderRadius: 12,
+              width: "min(92vw, 420px)",
+              boxShadow: "0 10px 30px rgba(0,0,0,0.20)",
+              overflow: "hidden"
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setShowConfirm(false);
+            }}
+          >
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #eee" }}>
+              <div id="confirm-title" style={{ fontWeight: 700, fontSize: 18 }}>
+                Submit simulation?
+              </div>
+              <div style={{ marginTop: 6, color: "#555", fontSize: 14 }}>
+                You won’t be able to type in this channel after submission.
+              </div>
+            </div>
+
+            <div style={{ padding: 20, display: "flex", gap: 12, justifyContent: "flex-end" }}>
+              <button
+                className="btn"
+                onClick={() => setShowConfirm(false)}
+                style={{ padding: "8px 14px" }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn--success"
+                onClick={() => {
+                  setShowConfirm(false);
+                  handleSubmitSimulation(false); // submit & lock (existing logic)
+                }}
+                style={{ padding: "8px 14px" }}
+                autoFocus
+              >
+                Confirm Submit
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -752,3 +851,4 @@ function Bubble({ sender, name, text, taskSummary, onOpenTask }) {
     </div>
   );
 }
+
