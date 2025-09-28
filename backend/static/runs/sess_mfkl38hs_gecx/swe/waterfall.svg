@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="160">
+  <style>.t{font:12px sans-serif;fill:#111}.axis{stroke:#ccc}.bar{fill:#66a3ff}.bar.slow{fill:#ff4d4f}</style>
+  <rect width="100%" height="100%" fill="#fff"/>
+  <text class="t" x="12" y="20">Network Waterfall (ms) — sess s_gecx</text>
+  <line x1="150" y1="30"  x2="740" y2="30"  class="axis"/>
+  <line x1="150" y1="60"  x2="740" y2="60"  class="axis"/>
+  <line x1="150" y1="90"  x2="740" y2="90"  class="axis"/>
+  <line x1="150" y1="120" x2="740" y2="120" class="axis"/>
+
+  <text class="t" x="10" y="50">GET /api/me</text>
+  <rect class="bar" x="150" y="38" width="17" height="14"/>
+  <text class="t" x="177" y="50">~198ms</text>
+
+  <text class="t" x="10" y="80">GET /api/stats</text>
+  <rect class="bar slow" x="150" y="68" width="739" height="14"/>
+  <text class="t" x="899" y="80">~8.9s (TTFB)</text>
+
+  <text class="t" x="10" y="110">GET /assets.js</text>
+  <rect class="bar" x="150" y="98" width="24" height="14"/>
+  <text class="t" x="184" y="110">~292ms</text>
+
+  <text class="t" x="10" y="140">GET /css.css</text>
+  <rect class="bar" x="150" y="128" width="15" height="14"/>
+  <text class="t" x="175" y="140">~184ms</text>
+</svg>

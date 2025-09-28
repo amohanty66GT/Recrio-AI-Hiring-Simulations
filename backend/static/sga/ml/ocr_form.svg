@@ -1,0 +1,17 @@
+
+---
+
+### `backend/static/sga/ml/ocr_form.svg`
+```svg
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="220">
+  <style>.t{font:12px sans-serif;fill:#111}.box{fill:#f8f8f8;stroke:#ccc}.miss{fill:#fff3cd;stroke:#f0ad4e}</style>
+  <rect width="100%" height="100%" fill="#fff"/>
+  <rect class="box" x="20" y="20" width="660" height="180" rx="8"/>
+  <text class="t" x="40" y="50">Student Org Funding Form (OCR)</text>
+  <text class="t" x="40" y="80">Organization: RoboJackets</text>
+  <text class="t" x="40" y="110">Event: Fall Kickoff</text>
+  <rect class="miss" x="40" y="130" width="280" height="30" rx="4"/>
+  <text class="t" x="45" y="150">Requested Amount: — (missing)</text>
+  <text class="t" x="340" y="150">Confidence: 0.41</text>
+  <text class="t" x="40" y="175">Note: slight tilt / low contrast</text>
+</svg>

@@ -1,0 +1,102 @@
+{
+  "meta": { "id": "sga-de-v2", "title": "SGA — Data Engineer: Survey Pipeline Off (Dynamic)", "durationMin": 40, "tags": ["de","sga","dynamic"] },
+  "constraints": { "tabSwitchLocks": true, "cameraRequired": true },
+  "channels": [
+    { "name": "incidents-war-room", "topic": "Coordinating a data freshness issue.", "seed": [] },
+    { "name": "realtime-inference", "topic": "Data quality guardrails + collaboration.", "seed": [] },
+    { "name": "exec-brief", "topic": "Plain-English updates to SGA leadership.", "seed": [] }
+  ],
+  "script": {
+    "incidents-war-room": [
+      {
+        "id": "intro",
+        "say": [
+          { "sender": "system", "text": "You're on SGA's data team. A weekly student survey powers the engagement dashboard, but last week's numbers look too low. It coincides with an Airflow upgrade and a small schema change to the target table. You're pulled in to verify and steady the pipeline." },
+          { "sender": "analyst", "text": "If this lands on your plate, how do you confirm it's a *real* data issue (not a slice)?" }
+        ],
+        "conversationFlow": {
+          "type": "ababab",
+          "maxFollowUps": 2,
+          "role": "de"
+        },
+        "on": {
+          "message": [
+            { "when": { "containsAny": ["compare","counts","sample","source","freshness","backfill","range"] }, "say": [ { "sender": "data-platform", "text": "Here’s an Airflow task log from the last run. Anything stand out?", "taskId": "t-de-airflow" } ], "next": "airflow" },
+            { "when": { "otherwise": true }, "say": [ { "sender": "data-platform", "text": "Fair. You can compare source vs. warehouse counts. Meanwhile, here’s an Airflow task log—what do you notice?", "taskId": "t-de-airflow" } ], "next": "airflow" }
+          ]
+        }
+      },
+      {
+        "id": "airflow",
+        "say": [],
+        "on": {
+          "taskResult:t-de-airflow": [
+            { "when": { "containsAny": ["auth","401","permission","schema","column","mismatch"] }, "say": [ { "sender": "data-platform", "text": "Right—auth hiccup + schema drift are likely. The table seems to be missing a column. How would you patch it safely?" } ], "next": "schema" },
+            { "when": { "otherwise": true }, "say": [ { "sender": "data-platform", "text": "We’re likely seeing an auth hiccup or schema drift. The table is missing a column; how would you patch it safely?" } ], "next": "schema" }
+          ]
+        }
+      },
+      {
+        "id": "schema",
+        "say": [ { "sender": "data-platform", "text": "Take a look at the partial schema and propose a safe alteration.", "taskId": "t-de-schema" } ],
+        "on": {
+          "taskResult:t-de-schema": [
+            { "when": { "containsAny": ["alter","add column","nullable","default","backfill","idempotent"] }, "say": [ { "sender": "team-lead", "text": "Pick a low-risk safeguard for this week." } ], "next": "safeguard" },
+            { "when": { "otherwise": true }, "say": [ { "sender": "team-lead", "text": "We’ll need a safe ALTER + backfill. Pick a low-risk safeguard for this week." } ], "next": "safeguard" }
+          ]
+        }
+      },
+      {
+        "id": "safeguard",
+        "say": [ { "sender": "team-lead", "text": "Choose the best low-risk protection (this week).", "taskId": "t-de-mcq-safeguard" } ],
+        "on": { "taskResult:t-de-mcq-safeguard": [ { "when": { "otherwise": true }, "say": [ { "sender": "system", "text": "Great—post a one-liner status and next step." } ], "next": null } ] }
+      }
+    ],
+    "realtime-inference": [
+      { "id": "rti-1", "say": [ { "sender": "data-platform", "text": "What’s one alert you’d add so we hear about bad runs automatically?" } ], "on": { "message": [ { "when": { "otherwise": true }, "say": [ { "sender": "data-platform", "text": "Nice. How would you avoid duplicates if we backfill the last two weeks?" } ], "next": null } ] } }
+    ],
+    "exec-brief": [
+      { "id": "brief-1", "say": [ { "sender": "cto", "text": "One-liner: what do we think happened and what are you doing next?" } ], "on": { "message": [ { "when": { "otherwise": true }, "say": [ { "sender": "cto", "text": "Thanks—1–3 bullets: what happened, what we fixed, what’s next." } ], "next": null } ] } }
+    ]
+  },
+  "tasks": [
+    {
+      "id": "t-de-airflow",
+      "type": "image_troubleshoot",
+      "title": "Airflow task log",
+      "prompt": "Skim the log. What likely went wrong?",
+      "asset": { "kind": "image", "url": "/static/sga/de/airflow_log.svg", "alt": "Airflow log with HTTP 401 and schema mismatch" },
+      "answer": { "kind": "freeform", "minWords": 6, "rubric": [
+        { "match": { "regex": "auth|401|permission|credentials", "flags": "i" }, "score": 2, "why": "Spots authorization issue" },
+        { "match": { "regex": "schema|column|missing|mismatch", "flags": "i" }, "score": 2, "why": "Spots schema drift" },
+        { "match": { "regex": "retry|backoff|alert|notify", "flags": "i" }, "score": 1, "why": "Practical next step" }
+      ], "maxScore": 5 }
+    },
+    {
+      "id": "t-de-schema",
+      "type": "doc_review",
+      "title": "Fix the table",
+      "prompt": "What column is missing and how would you add it safely?",
+      "asset": { "kind": "markdown", "url": "/static/sga/de/survey_schema.md" },
+      "answer": { "kind": "freeform", "minWords": 12, "rubric": [
+        { "match": { "regex": "ALTER\\s+TABLE|ADD\\s+COLUMN|nullable|default", "flags": "i" }, "score": 3, "why": "Safe ALTER proposed" },
+        { "match": { "regex": "backfill|recompute|idempotent", "flags": "i" }, "score": 1, "why": "Safe backfill approach" },
+        { "match": { "regex": "index|unique|primary", "flags": "i" }, "score": 1, "why": "Index/uniqueness considered" }
+      ], "maxScore": 5 }
+    },
+    {
+      "id": "t-de-mcq-safeguard",
+      "type": "mcq",
+      "title": "Pick the safeguard",
+      "prompt": "Choose the best low-risk protection for this week.",
+      "choices": [
+        { "key": "A", "label": "Alert if row count drops >30% vs. prior week" },
+        { "key": "B", "label": "Rewrite the entire pipeline from scratch" },
+        { "key": "C", "label": "Disable the dashboard until data is perfect" }
+      ],
+      "correct": "A",
+      "score": 3
+    }
+  ]
+}
+

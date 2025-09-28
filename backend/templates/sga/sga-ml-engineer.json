@@ -1,0 +1,101 @@
+{
+  "meta": { "id": "sga-ml-v2", "title": "SGA — ML Engineer: OCR + Attendance Forecast (Dynamic)", "durationMin": 40, "tags": ["ml","sga","dynamic"] },
+  "constraints": { "tabSwitchLocks": true, "cameraRequired": true },
+  "channels": [
+    { "name": "incidents-war-room", "topic": "OCR forms missing fields + forecasting.", "seed": [] },
+    { "name": "realtime-inference", "topic": "Serving guardrails + drift checks.", "seed": [] },
+    { "name": "exec-brief", "topic": "Short leadership updates.", "seed": [] }
+  ],
+  "script": {
+    "incidents-war-room": [
+      {
+        "id": "intro",
+        "say": [
+          { "sender": "system", "text": "You're stepping in as an ML Engineer. The OCR pipeline scans student org funding forms. Some PDFs miss the 'Requested Amount' field. Separately, we want a quick attendance forecast baseline." },
+          { "sender": "pm", "text": "If you were debugging OCR, what's the first thing you'd check?" }
+        ],
+        "conversationFlow": {
+          "type": "ababab",
+          "maxFollowUps": 2,
+          "role": "ml"
+        },
+        "on": {
+          "message": [
+            { "when": { "containsAny": ["quality","resolution","skew","blur","contrast","preprocess","template","field"] }, "say": [ { "sender": "pm", "text": "Here’s a sample OCR output. What do you notice and what would you try next?", "taskId": "t-ml-ocr" } ], "next": "ocr" },
+            { "when": { "otherwise": true }, "say": [ { "sender": "pm", "text": "Start with input quality + template detection. Here’s a sample. What do you notice and what would you try next?", "taskId": "t-ml-ocr" } ], "next": "ocr" }
+          ]
+        }
+      },
+      {
+        "id": "ocr",
+        "say": [],
+        "on": {
+          "taskResult:t-ml-ocr": [
+            { "when": { "containsAny": ["preprocess","deskew","contrast","threshold","template","zone","anchor","human review","confidence"] }, "say": [ { "sender": "data", "text": "Great. Now a quick forecasting baseline—call out one trend and propose a simple baseline.", "taskId": "t-ml-attendance" } ], "next": "forecast" },
+            { "when": { "otherwise": true }, "say": [ { "sender": "data", "text": "We’ll try a bit of preprocessing + template checks. Also need a quick forecast baseline—call out a trend and propose a baseline.", "taskId": "t-ml-attendance" } ], "next": "forecast" }
+          ]
+        }
+      },
+      {
+        "id": "forecast",
+        "say": [],
+        "on": {
+          "taskResult:t-ml-attendance": [
+            { "when": { "containsAny": ["seasonal","semester","moving average","naive","last semester","holdout","mape","rmse"] }, "say": [ { "sender": "team-lead", "text": "We need a rollout plan: quick MVP with human review for low-confidence fields, or wait for a higher-accuracy model? Pick one and explain for leadership.", "taskId": "t-ml-mcq-tradeoff" } ], "next": "decision" },
+            { "when": { "otherwise": true }, "say": [ { "sender": "team-lead", "text": "Thanks. Pick a rollout plan (MVP + human review vs. delay for quality).", "taskId": "t-ml-mcq-tradeoff" } ], "next": "decision" }
+          ]
+        }
+      },
+      {
+        "id": "decision",
+        "say": [],
+        "on": { "taskResult:t-ml-mcq-tradeoff": [ { "when": { "otherwise": true }, "say": [ { "sender": "system", "text": "Share a one-liner status and next step we can tell leadership." } ], "next": null } ] }
+      }
+    ],
+    "realtime-inference": [
+      { "id": "rti-1", "say": [ { "sender": "platform", "text": "What guardrail would you add so low-confidence OCR outputs are flagged automatically?" } ], "on": { "message": [ { "when": { "otherwise": true }, "say": [ { "sender": "platform", "text": "If model drift becomes a concern, what’s one simple monitor you’d start with?" } ], "next": null } ] } }
+    ],
+    "exec-brief": [
+      { "id": "brief-1", "say": [ { "sender": "cto", "text": "One line: what’s happening and what are you doing next?" } ], "on": { "message": [ { "when": { "otherwise": true }, "say": [ { "sender": "cto", "text": "Wrap with 1–3 bullets I can paste to leadership: what happened, what we tried, what’s next." } ], "next": null } ] } }
+    ]
+  },
+  "tasks": [
+    {
+      "id": "t-ml-ocr",
+      "type": "image_troubleshoot",
+      "title": "OCR output check",
+      "prompt": "What might be causing the missing field, and what’s one change you’d test?",
+      "asset": { "kind": "image", "url": "/static/sga/ml/ocr_form.svg", "alt": "OCR result with empty 'Requested Amount' field" },
+      "answer": { "kind": "freeform", "minWords": 8, "rubric": [
+        { "match": { "regex": "resolution|skew|blur|contrast|preprocess", "flags": "i" }, "score": 2, "why": "Notes input/preprocessing" },
+        { "match": { "regex": "template|zone|field|anchor|layout", "flags": "i" }, "score": 2, "why": "Template/field detection" },
+        { "match": { "regex": "human\\s*review|threshold|confidence", "flags": "i" }, "score": 1, "why": "Practical guardrail" }
+      ], "maxScore": 5 }
+    },
+    {
+      "id": "t-ml-attendance",
+      "type": "doc_review",
+      "title": "Attendance trend",
+      "prompt": "Point out a simple trend and propose a baseline forecast.",
+      "asset": { "kind": "markdown", "url": "/static/sga/ml/attendance_trend.md" },
+      "answer": { "kind": "freeform", "minWords": 10, "rubric": [
+        { "match": { "regex": "seasonal|semester|trend|up|down", "flags": "i" }, "score": 2, "why": "Identifies trend/seasonality" },
+        { "match": { "regex": "moving\\s*average|naive|last\\s*semester|baseline", "flags": "i" }, "score": 2, "why": "Reasonable baseline" },
+        { "match": { "regex": "holdout|split|evaluate|mape|rmse", "flags": "i" }, "score": 1, "why": "Mentions evaluation" }
+      ], "maxScore": 5 }
+    },
+    {
+      "id": "t-ml-mcq-tradeoff",
+      "type": "mcq",
+      "title": "Rollout decision",
+      "prompt": "What do we do this week?",
+      "choices": [
+        { "key": "A", "label": "Roll out an MVP with human review for low-confidence fields" },
+        { "key": "B", "label": "Delay launch until perfect accuracy" },
+        { "key": "C", "label": "Launch as-is and fix later" }
+      ],
+      "correct": "A",
+      "score": 3
+    }
+  ]
+}

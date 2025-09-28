@@ -1,0 +1,137 @@
+{
+  "meta": { "id": "sga-swe-v2", "title": "SGA — SWE: Student Dashboard Reliability (Dynamic)", "durationMin": 40, "tags": ["swe","sga","dynamic"] },
+  "constraints": { "tabSwitchLocks": true, "cameraRequired": true },
+  "channels": [
+    { "name": "incidents-war-room", "topic": "Real-time coordination on a slow dashboard issue.", "seed": [] },
+    { "name": "realtime-inference", "topic": "Performance chatter and soft-skills judgment.", "seed": [] },
+    { "name": "exec-brief", "topic": "Short, plain-English updates to SGA leadership.", "seed": [] }
+  ],
+  "script": {
+    "incidents-war-room": [
+      {
+        "id": "intro",
+        "say": [
+          { "sender": "system", "text": "Welcome to Georgia Tech SGA's tech team. It's the first-week rush; more students are checking club budgets/events than usual. 20 minutes after a small update shipped, the analytics page became very slow. Other pages look fine. It's worse between classes. No DB schema changes were part of the update. You're on point to help triage and steady things." },
+          { "sender": "frontend", "text": "If this were your ticket, what's the very first thing you would do to get a sense of *where* the slowness is?" }
+        ],
+        "conversationFlow": {
+          "type": "ababab",
+          "maxFollowUps": 2,
+          "role": "swe"
+        },
+        "on": {
+          "message": [
+            { "when": { "containsAny": ["network","waterfall","perf","trace","profile","devtools","timing"] }, "say": [ { "sender": "frontend", "text": "Perfect—here’s a quick network waterfall from a student device. What jumps out?", "taskId": "t-swe-waterfall" } ], "next": "waterfall" },
+            { "when": { "otherwise": true }, "say": [ { "sender": "frontend", "text": "You can start with the browser network waterfall to spot the bottleneck. Here’s one. What do you notice?", "taskId": "t-swe-waterfall" } ], "next": "waterfall" }
+          ]
+        }
+      },
+      {
+        "id": "waterfall",
+        "say": [],
+        "on": {
+          "taskResult:t-swe-waterfall": [
+            { "when": { "containsAny": ["db","query","sql","endpoint","server","backend","ttfb","index","join"] }, "say": [ { "sender": "backend", "text": "Agree—the backend’s likely the bottleneck. What signal convinced you?" } ], "next": "sql" },
+            { "when": { "otherwise": true }, "say": [ { "sender": "backend", "text": "Interesting. If the browser isn’t the main bottleneck, what server-side check would you do next?" } ], "next": "sql" }
+          ]
+        }
+      },
+      {
+        "id": "sql",
+        "say": [ { "sender": "backend", "text": "Here’s the current SQL pulling the analytics panel. How would you improve it?", "taskId": "t-swe-sql" } ],
+        "on": {
+          "taskResult:t-swe-sql": [
+            { "when": { "containsAny": ["index","explain","plan","select","cache","ttl","filter","where"] }, "say": [ { "sender": "product", "text": "Thanks. It’s peak traffic now—trade off a short TTL cache vs. creating an index at peak?" } ], "next": "decision" },
+            { "when": { "otherwise": true }, "say": [ { "sender": "product", "text": "We might still need an index or short TTL. Which would you use first at peak and why?" } ], "next": "decision" }
+          ]
+        }
+      },
+      {
+        "id": "decision",
+        "say": [ { "sender": "product", "text": "Pick a safe next step and justify it briefly.", "taskId": "t-swe-mcq-decision" } ],
+        "on": {
+          "taskResult:t-swe-mcq-decision": [
+            { "when": { "containsAny": ["A"] }, "say": [ { "sender": "system", "text": "Great—post a one-liner to the team: what’s happening now and what you’ll do next." } ], "next": "wrap" },
+            { "when": { "otherwise": true }, "say": [ { "sender": "system", "text": "Noted. Post a one-liner to the team: what’s happening now and what you’ll do next." } ], "next": "wrap" }
+          ]
+        }
+      },
+      {
+        "id": "wrap",
+        "say": [],
+        "on": { "message": [ { "when": { "otherwise": true }, "say": [ { "sender": "system", "text": "Thanks—switch over to #realtime-inference to help the team align." } ], "next": null } ] }
+      }
+    ],
+
+    "realtime-inference": [
+      {
+        "id": "rti-1",
+        "say": [ { "sender": "platform", "text": "Two teammates disagree on a cache TTL: Alex wants 10 minutes, Priya says 60 seconds. What info would you ask for before weighing in?" } ],
+        "on": {
+          "message": [
+            { "when": { "containsAny": ["fresh","stale","traffic","peak","read","write","latency","volume"] }, "say": [ { "sender": "platform", "text": "Good. Alex adds: long caches hide regressions. Priya: students need speed more than perfect freshness. How do you help them move forward?" } ], "next": "rti-2" },
+            { "when": { "otherwise": true }, "say": [ { "sender": "platform", "text": "Consider freshness vs. speed and current traffic patterns. Then how do you help them move forward?" } ], "next": "rti-2" }
+          ]
+        }
+      },
+      {
+        "id": "rti-2",
+        "say": [ { "sender": "platform", "text": "Alex points to a red CI perf test; Priya says it’s flaky. You have 10 minutes. What’s your call and how do you communicate it to both?" } ],
+        "on": { "message": [ { "when": { "containsAny": ["timebox","rollback","temporary","experiment","flag","alert","metric","monitor"] }, "say": [ { "sender": "platform", "text": "Great. Post your exact one-liner you’d write in this channel." } ], "next": null } ] }
+      }
+    ],
+
+    "exec-brief": [
+      {
+        "id": "brief-1",
+        "say": [ { "sender": "cto", "text": "One sentence: what’s happening and what are you doing next?" } ],
+        "on": { "message": [ { "when": { "containsAny": ["now","next","cache","index","monitor","rollback"] }, "say": [ { "sender": "cto", "text": "Thanks. What risks remain and how are we watching them?" } ], "next": "brief-2" } ] }
+      },
+      {
+        "id": "brief-2",
+        "say": [ { "sender": "cto", "text": "Wrap with 1–3 bullets I can paste to leadership: what happened, what we tried, what’s next." } ],
+        "on": { "message": [ { "when": { "otherwise": true }, "say": [], "next": null } ] }
+      }
+    ]
+  },
+
+  "tasks": [
+    {
+      "id": "t-swe-waterfall",
+      "type": "image_troubleshoot",
+      "title": "Skim the network waterfall",
+      "prompt": "Which request is the bottleneck and what early guess do you have?",
+      "asset": { "kind": "image", "url": "/static/sga/swe/waterfall.svg", "alt": "Network waterfall with one request ~9s TTFB" },
+      "answer": { "kind": "freeform", "minWords": 6, "rubric": [
+        { "match": { "regex": "api|query|sql|endpoint|single request", "flags": "i" }, "score": 2, "why": "Identifies the slow request" },
+        { "match": { "regex": "server|db|index|n\\+1|join|aggregation", "flags": "i" }, "score": 2, "why": "Points to likely backend cause" },
+        { "match": { "regex": "measure|profile|trace", "flags": "i" }, "score": 1, "why": "Proposes a concrete next step" }
+      ], "maxScore": 5 }
+    },
+    {
+      "id": "t-swe-sql",
+      "type": "doc_review",
+      "title": "Query review",
+      "prompt": "Review the SQL and propose a change to make it faster.",
+      "asset": { "kind": "markdown", "url": "/static/sga/swe/slow_query.md" },
+      "answer": { "kind": "freeform", "minWords": 12, "rubric": [
+        { "match": { "regex": "index|create\\s+index|where.*date|select\\s+columns|avoid\\s+select\\s+\\*|materialized", "flags": "i" }, "score": 3, "why": "Suggests meaningful optimization" },
+        { "match": { "regex": "explain|analyze|plan", "flags": "i" }, "score": 1, "why": "Mentions inspecting query plan" },
+        { "match": { "regex": "cache|ttl|memo", "flags": "i" }, "score": 1, "why": "Considers caching appropriately" }
+      ], "maxScore": 5 }
+    },
+    {
+      "id": "t-swe-mcq-decision",
+      "type": "mcq",
+      "title": "Pick a safe next move",
+      "prompt": "What should we do in the next hour?",
+      "choices": [
+        { "key": "A", "label": "Ship a 5-minute cache on the slow endpoint and monitor" },
+        { "key": "B", "label": "Rewrite the query fully before changing anything" },
+        { "key": "C", "label": "Wait and see—maybe traffic will drop" }
+      ],
+      "correct": "A",
+      "score": 3
+    }
+  ]
+}

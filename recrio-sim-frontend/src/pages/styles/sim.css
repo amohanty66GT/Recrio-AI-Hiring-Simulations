@@ -1,0 +1,321 @@
+/* =============================================================
+ * Simulation Runner Styles (sim.css)
+ * Includes original multi-channel chat sim + new dashboard/badges.
+ * ============================================================= */
+
+/* Container */
+.sim {
+  position: relative;
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  background: #f9fafb;
+  font-family: system-ui, sans-serif;
+}
+
+/* Sidebar */
+.sim__sidebar {
+  width: 220px;
+  background: #1e293b;
+  color: #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+}
+.sim__brand {
+  font-weight: 700;
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+.sim__section {
+  font-size: 12px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  color: #94a3b8;
+}
+.sim__chanlist {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sim__chan {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.sim__chan:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.sim__chan.is-active {
+  background: rgba(255, 255, 255, 0.15);
+}
+.sim__chan.is-locked {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.sim__chan-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sim__chan-name {
+  font-size: 14px;
+}
+.sim__chan-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sim__badge {
+  background: #ef4444;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+.sim__lock {
+  font-size: 14px;
+}
+.sim__blink {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #38bdf8;
+  display: inline-block;
+}
+
+/* Main area */
+.sim__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.sim__header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.sim__header-title {
+  font-weight: 600;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sim__hash {
+  color: #64748b;
+}
+.sim__header-lock {
+  font-size: 12px;
+  color: #ef4444;
+}
+.sim__topic {
+  font-size: 12px;
+  color: #64748b;
+}
+.sim__tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sim__toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #475569;
+}
+
+/* Feed */
+.sim__feed {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background: #f8fafc;
+}
+.locknote {
+  font-size: 13px;
+  color: #ef4444;
+  margin-top: 10px;
+}
+
+/* Composer */
+.sim__composer {
+  padding: 12px 16px;
+  border-top: 1px solid #e2e8f0;
+  background: #fff;
+}
+.composer {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.composer.is-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.composer__input {
+  flex: 1;
+  min-height: 50px;
+  resize: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 14px;
+}
+.sim__hint {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 6px;
+}
+
+/* Buttons */
+.btn {
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn--primary {
+  background: #2563eb;
+  color: #fff;
+}
+.btn--primary:hover {
+  background: #1d4ed8;
+}
+.btn--ghost {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+}
+.btn--disabled {
+  background: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* Bubbles */
+.bubble {
+  margin-bottom: 10px;
+  max-width: 70%;
+}
+.bubble--me {
+  margin-left: auto;
+  text-align: right;
+}
+.bubble--founder {
+  background: #fef9c3;
+  border-radius: 8px;
+  padding: 6px;
+}
+.bubble__meta {
+  font-size: 11px;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+.bubble__text {
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 14px;
+  border: 1px solid #e2e8f0;
+}
+
+/* Overlay (start) */
+.sim__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.panel {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 400px;
+  text-align: center;
+}
+.panel__title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.panel__body {
+  font-size: 14px;
+  margin-bottom: 16px;
+  color: #475569;
+}
+.panel__actions .btn {
+  font-size: 14px;
+}
+
+/* Flash */
+.sim__flash {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ef4444;
+  color: #fff;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 60;
+}
+
+/* --- New Elements --- */
+
+/* Badges (camera + violations) */
+.badge {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+}
+.badge-ok {
+  background: rgba(34, 197, 94, 0.15);
+}
+.badge-bad {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+/* Escalation Dashboard (right panel) */
+aside.fixed {
+  font-family: system-ui, sans-serif;
+}
+aside.fixed h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+aside.fixed ol {
+  margin-top: 6px;
+}
+aside.fixed li {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 6px;
+}
+
+/* Buttons inside sim-stage (optional testing) */
+.btn {
+  margin-right: 6px;
+}
