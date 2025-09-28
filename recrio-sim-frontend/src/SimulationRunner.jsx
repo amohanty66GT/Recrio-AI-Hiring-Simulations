@@ -135,6 +135,61 @@ export default function SimulationRunner() {
       if (nextName && nextName !== ch) setActive(nextName);
     }
   }, [active, channels, sessionId, socketRef, setHistory, setLocked, setActive]);
+// NEW: soft-penalty on proctor violation (no locking, just skip Q and +1 violation)
+const handleViolationSkip = useCallback((reason, channelName) => {
+  const ch = channelName || active;
+  if (!ch) return;
+
+  // 1) Count the violation
+  setViolations(v => v + 1);
+
+  // 2) Tell backend (keeps your existing telemetry)
+  socketRef.current?.emit?.("proctor:event", {
+    type: "violation",
+    reason,
+    channel: ch,
+    sessionId,
+    ts: Date.now(),
+  });
+
+  // 3) Advance the conversation to the next question
+  setConversationState(prev => {
+    let { qIdx, fIdx } = prev;
+    let remaining = (prev.remaining ?? MAX_BOT_TURNS);
+
+    const nextIdx = qIdx + 1;
+    const hasNext = !!sessionQuestions[nextIdx];
+
+    if (hasNext && remaining > 0) {
+      const nq = sessionQuestions[nextIdx];
+      const nextText = nq?.text ?? nq?.prompt ?? "";
+      const nextName = nq?.sender || "Interviewer";
+
+      // Post a system note and the next question
+      setHistory(prevH => ({
+        ...prevH,
+        [ch]: [
+          ...(prevH[ch] || []),
+          { sender: "system", text: "Tab switch detected — current question skipped.", ts: Date.now() },
+          { sender: "bot:interviewer", name: nextName, text: nextText, ts: Date.now() },
+        ],
+      }));
+
+      // One bot turn consumed when we post the next question
+      return { qIdx: nextIdx, fIdx: -1, remaining: Math.max(0, remaining - 1) };
+    }
+
+    // No more questions to skip — just note it
+    setHistory(prevH => ({
+      ...prevH,
+      [ch]: [
+        ...(prevH[ch] || []),
+        { sender: "system", text: "Tab switch detected — no more questions to skip.", ts: Date.now() },
+      ],
+    }));
+    return prev;
+  });
+}, [active, sessionId, sessionQuestions, setHistory]);
 
   // Create session
   useEffect(() => {
@@ -273,32 +328,37 @@ export default function SimulationRunner() {
   }, []);
 
   useEffect(() => {
-    if (!started || !active) return;
-    const lockingRef = { current: false };
-    const lockOnce = (reason) => {
-      if (lockingRef.current) return;
-      lockingRef.current = true;
-      const channelAtEvent = active;
-      lockActiveAndAdvance(reason, channelAtEvent);
-    };
-    const onVis = () => {
-      if (document.hidden && !locked[active]) lockOnce("visibility:hidden");
-    };
-    const onBlur = () => {
-      if (!locked[active]) lockOnce("window:blur");
-    };
-    const onFocus = () => {
-      lockingRef.current = false;
-    };
-    document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("blur", onBlur);
-    window.addEventListener("focus", onFocus);
-    return () => {
-      document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("blur", onBlur);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [started, active, locked, lockActiveAndAdvance]);
+  if (!started || !active) return;
+  const onceRef = { current: false };
+
+  const tripOnce = (reason) => {
+    if (onceRef.current) return;
+    onceRef.current = true;
+    // Soft penalty: count violation + skip question (NO locking)
+    handleViolationSkip(reason, active);
+  };
+
+  const onVis = () => {
+    if (document.hidden) tripOnce("visibility:hidden");
+  };
+  const onBlur = () => {
+    tripOnce("window:blur");
+  };
+  const onFocus = () => {
+    // Allow future penalties after the user returns
+    onceRef.current = false;
+  };
+
+  document.addEventListener("visibilitychange", onVis);
+  window.addEventListener("blur", onBlur);
+  window.addEventListener("focus", onFocus);
+  return () => {
+    document.removeEventListener("visibilitychange", onVis);
+    window.removeEventListener("blur", onBlur);
+    window.removeEventListener("focus", onFocus);
+  };
+}, [started, active, handleViolationSkip]);
+
 
   // --- Random scenario and questions selection ---
   useEffect(() => {
