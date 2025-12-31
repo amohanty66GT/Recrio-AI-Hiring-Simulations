@@ -1,22 +1,19 @@
 # Recrio-AI-Hiring-Simulations
-Recrio Simulation is an open source project that demonstrates the core experience of role based work simulations. It is a simplified version of the commercial Recrio product. This repository is meant for learning, experimentation, and contribution, not as a full production deployment.
+Recrio is a simulation platform that helps organizations evaluate how candidates think and work in realistic job environments. Instead of relying only on resumes or quizzes, Recrio places candidates in a workplace style setting where they navigate tasks, collaborate in channels, review documents, and make decisions similar to an actual role.
 
-The goal of the simulation is to place a candidate inside a realistic team environment where they solve tasks, work with information, and make decisions similar to an actual job. The focus is on judgment, communication quality, prioritization, and problem solving.
+The goal is to measure judgment, problem solving, communication clarity, and ability to operate with incomplete information. Candidates interact with scenarios that feel like real work rather than theoretical test questions. This allows teams to understand not only what someone knows, but how they apply it.
 
-This project intentionally excludes proprietary scoring methods, advanced multi agent systems, internal datasets, business logic, and integrations used in the production platform.
+Recrio focuses especially on startup and high growth environments where adaptability, prioritization, and tradeoffs matter. The platform emphasizes:
 
-What this project is
+realistic task flows
 
-This open source version highlights:
+multi step decision making
 
-A workspace style simulation flow
+role specific context
 
-Task based and scenario driven prompts
+signal on applied thinking rather than trivia
 
-Lightweight frontend and backend example structure
+The version in this repository represents a simplified demonstration of that idea. The full commercial platform includes additional systems and features that are not part of this open source project.
 
-Sample channels and interactions
 
-A foundation that developers can extend
 
-It shows the concept of simulation driven assessment without revealing confidential approaches or company specific systems.
